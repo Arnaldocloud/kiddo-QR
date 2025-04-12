@@ -1,25 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, Camera } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 
-declare class Html5QrcodeScanner {
-  constructor(
-    elementId: string,
-    config: {
-      fps?: number;
-      qrbox?: { width: number; height: number };
-      aspectRatio?: number;
-      qrCodeSuccessCallback?: (decodedText: string, decodedResult: any) => void;
-      qrCodeErrorCallback?: (errorMessage: string, optionalData: any) => void;
-    },
-    verbose?: boolean
-  );
-  start(constraints: MediaStreamConstraints): Promise<void>;
-  stop(): Promise<void>;
-  clear(): void;
-}
 
 interface QRScannerProps {
   onScan: (data: string) => void;
@@ -28,33 +13,25 @@ interface QRScannerProps {
   scanningContainerStyle?: React.CSSProperties;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ 
-  onScan, 
+const QRScanner: React.FC<QRScannerProps> = ({
+  onScan,
   onCancel,
   scanningAreaStyle,
   scanningContainerStyle
 }) => {
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isCameraAvailable, setIsCameraAvailable] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scanningAreaRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState('');
   const { toast } = useToast();
 
-  // Configuración del scanner
-  const qrCodeSuccessCallback = (decodedText: string) => {
-    setIsScanning(false);
+  const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
     onScan(decodedText);
-    toast({
-      title: "¡Éxito!",
-      description: "Código QR escaneado correctamente",
-      variant: "default",
-    });
+    stopScanner();
   };
 
-  const qrCodeErrorCallback = (err: any) => {
-    setError(err.message);
+  const qrCodeErrorCallback = (errorMessage: string, optionalData: any) => {
+    setError(errorMessage);
     toast({
       title: "Error",
       description: "Error al escanear el código QR",
@@ -64,30 +41,25 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
   const startScanner = async () => {
     try {
-      if (!containerRef.current || !scanningAreaRef.current) return;
-
       const config = {
         fps: 10,
         qrbox: { width: 250, height: 250 },
-        aspectRatio: 1,
-        qrCodeSuccessCallback,
-        qrCodeErrorCallback
+        aspectRatio: 1
       };
 
-      const scanner = new Html5QrcodeScanner(
-        "html5qr-reader",
+      const scanner = new Html5Qrcode("html5qr-reader");
+      await scanner.start(
+        { facingMode: "environment" },
         config,
-        true
-      ) as Html5QrcodeScanner;
+        qrCodeSuccessCallback,
+        qrCodeErrorCallback
+      );
 
-      await scanner.start({ 
-        video: { facingMode: "environment" }
-      });
       scannerRef.current = scanner;
       setIsScanning(true);
       setIsCameraAvailable(true);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err.message || 'Error desconocido');
       toast({
         title: "Error",
         description: "No se pudo iniciar el escáner",
@@ -98,28 +70,40 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
   const stopScanner = () => {
     if (scannerRef.current) {
-      scannerRef.current.stop().then(() => {
-        setIsScanning(false);
+      const scanner = scannerRef.current;
+      if (scanner.getState() === Html5QrcodeScannerState.SCANNING || scanner.getState() === Html5QrcodeScannerState.PAUSED) {
+        scanner.stop().then(() => {
+          scanner.clear();
+          scannerRef.current = null;
+          setIsScanning(false);
+          setIsCameraAvailable(false);
+        }).catch(err => {
+          console.warn("No se pudo detener el escáner:", err);
+        });
+      } else {
+        // Ya estaba detenido
+        scanner.clear();
         scannerRef.current = null;
-      });
+        setIsScanning(false);
+        setIsCameraAvailable(false);
+      }
     }
   };
-
+  
   useEffect(() => {
-    if (!isScanning) {
+    return () => {
       stopScanner();
-    }
-  }, [isScanning]);
+    };
+  }, []);
 
   return (
     <Card className="w-full max-w-md">
       <CardContent className="p-6">
         <div className="flex flex-col gap-4">
           <div className="relative">
-            <div 
-              ref={containerRef} 
-              id="html5qr-reader" 
-              style={{ 
+            <div
+              id="html5qr-reader"
+              style={{
                 ...scanningContainerStyle,
                 width: '100%',
                 height: '300px',
@@ -128,9 +112,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 overflow: 'hidden'
               }}
             >
-              <div 
-                ref={scanningAreaRef} 
-                style={{ 
+              <div
+                style={{
                   ...scanningAreaStyle,
                   width: '100%',
                   height: '100%',
@@ -150,15 +133,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
           </div>
 
           <div className="flex gap-2">
-            <Button 
-              onClick={startScanner} 
+            <Button
+              onClick={startScanner}
               disabled={isScanning || isCameraAvailable}
             >
-              {isScanning ? 'Scaneando...' : 'Iniciar Escáner'}
+              {isScanning ? 'Escaneando...' : 'Iniciar Escáner'}
             </Button>
             {isScanning && (
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={() => {
                   stopScanner();
                   onCancel?.();
