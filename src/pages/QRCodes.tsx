@@ -1,23 +1,31 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import QRScanner from '@/components/qr/QRScanner';import { useAuth } from '@/components/auth/AuthProvider';
-import { useNavigate } from 'react-router-dom';import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import QRScanner from '@/components/qr/QRScanner';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useNavigate } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle } from 'lucide-react';
 
 const QRCodes = () => {
   const { user } = useAuth();
   const router = useNavigate();
   const [scannedData, setScannedData] = useState<string | null>(null);
+  const [estudianteEncontrado, setEstudianteEncontrado] = useState<boolean | null>(null);
 
   const handleQRScan = (data: string) => {
     setScannedData(data);
-    // Aquí puedes agregar la lógica para procesar el código QR
-    console.log('Código QR escaneado:', data);
+
+    // Simulamos búsqueda en la "base de datos"
+    const estudiantesSimulados = ['12345678', '98765432', '11223344'];
+    
+    const encontrado = estudiantesSimulados.includes(data.trim());
+    setEstudianteEncontrado(encontrado);
   };
 
   const handleCancel = () => {
     setScannedData(null);
+    setEstudianteEncontrado(null);
   };
 
   const handleBack = () => {
@@ -59,10 +67,20 @@ const QRCodes = () => {
           </CardContent>
         </Card>
 
-        {scannedData && (
+        {scannedData && estudianteEncontrado === true && (
           <Alert variant="default">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <AlertTitle>Estudiante encontrado</AlertTitle>
+            <AlertDescription>
+              <pre className="text-sm whitespace-pre-wrap">{scannedData}</pre>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {scannedData && estudianteEncontrado === false && (
+          <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Código QR Escaneado</AlertTitle>
+            <AlertTitle>Estudiante no encontrado</AlertTitle>
             <AlertDescription>
               <pre className="text-sm whitespace-pre-wrap">{scannedData}</pre>
             </AlertDescription>
