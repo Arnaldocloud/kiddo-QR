@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 
-
 interface QRScannerProps {
   onScan: (data: string) => void;
   onCancel?: () => void;
@@ -26,17 +25,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const { toast } = useToast();
 
   const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
-    onScan(decodedText);
+    onScan(decodedText.trim());
     stopScanner();
   };
 
   const qrCodeErrorCallback = (errorMessage: string, optionalData: any) => {
-    setError(errorMessage);
-    toast({
-      title: "Error",
-      description: "Error al escanear el código QR",
-      variant: "destructive",
-    });
+    // No mostramos toast para errores de lectura normales
+    // Puedes registrar en consola si quieres debug:
+    // console.warn("Error de escaneo QR:", errorMessage);
+    setError('');
   };
 
   const startScanner = async () => {
@@ -71,7 +68,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const stopScanner = () => {
     if (scannerRef.current) {
       const scanner = scannerRef.current;
-      if (scanner.getState() === Html5QrcodeScannerState.SCANNING || scanner.getState() === Html5QrcodeScannerState.PAUSED) {
+      const state = scanner.getState?.();
+      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
         scanner.stop().then(() => {
           scanner.clear();
           scannerRef.current = null;
@@ -89,7 +87,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
       }
     }
   };
-  
+
   useEffect(() => {
     return () => {
       stopScanner();
