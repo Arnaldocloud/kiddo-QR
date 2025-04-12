@@ -1,92 +1,93 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import QRScanner from '@/components/qr/QRScanner';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+// Puedes usar react-qr-reader u otro componente para el scanner
+// Este ejemplo es genérico
+
+interface Student {
+  id: string;
+  student_code: string;
+  name: string;
+  grade: string;
+}
 
 const QRCodes = () => {
   const { user } = useAuth();
-  const router = useNavigate();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
   const [scannedData, setScannedData] = useState<string | null>(null);
-  const [estudianteEncontrado, setEstudianteEncontrado] = useState<boolean | null>(null);
+  const [studentFound, setStudentFound] = useState<Student | null>(null);
 
-  const handleQRScan = (data: string) => {
-    setScannedData(data);
+  const handleQRScan = async (code: string) => {
+    if (!code) return;
 
-    // Simulamos búsqueda en la "base de datos"
-    const estudiantesSimulados = ['12345678', '98765432', '11223344'];
-    
-    const encontrado = estudiantesSimulados.includes(data.trim());
-    setEstudianteEncontrado(encontrado);
+    setScannedData(code);
+
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('student_code', code.trim())
+        .single();
+
+      if (error || !data) {
+        setStudentFound(null);
+        toast({
+          title: 'No encontrado',
+          description: 'No se encontró ningún estudiante con ese código',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setStudentFound(data);
+
+      toast({
+        title: 'Estudiante encontrado',
+        description: `${data.name} - ${data.grade}`,
+      });
+
+      console.log('Estudiante encontrado:', data);
+
+      // Puedes redirigir o abrir un modal si quieres:
+      // navigate(`/estudiantes/${data.id}`);
+    } catch (error) {
+      console.error('Error buscando estudiante:', error);
+      toast({
+        title: 'Error',
+        description: 'Hubo un problema al buscar el estudiante',
+        variant: 'destructive',
+      });
+    }
   };
-
-  const handleCancel = () => {
-    setScannedData(null);
-    setEstudianteEncontrado(null);
-  };
-
-  const handleBack = () => {
-    router('/dashboard');
-  };
-
-  if (!user) {
-    router('/login');
-    return null;
-  }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <CardHeader className="flex flex-col">
-          <CardTitle className="text-2xl font-bold">Escáner de QR</CardTitle>
-          <p className="text-gray-600">Escanea códigos QR para registrar asistencia</p>
-        </CardHeader>
-        <Button variant="outline" onClick={handleBack}>
-          Volver
-        </Button>
-      </div>
+    <div className="flex flex-col items-center p-4">
+      <h1 className="text-xl font-semibold mb-4">Escanear Código QR</h1>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <QRScanner 
-              onScan={handleQRScan} 
-              onCancel={handleCancel}
-              scanningContainerStyle={{
-                height: '400px',
-                border: '2px solid #2563eb',
-                borderRadius: '12px',
-              }}
-              scanningAreaStyle={{
-                backgroundColor: '#f3f4f6',
-              }}
-            />
-          </CardContent>
-        </Card>
+      {/* Aquí deberías integrar tu lector */}
+      {/* Este botón simula el escaneo con un código de prueba */}
+      <button
+        onClick={() => handleQRScan('ABC123')}
+        className="px-4 py-2 bg-blue-600 text-white rounded-md"
+      >
+        Simular escaneo de QR: ABC123
+      </button>
 
-        {scannedData && estudianteEncontrado === true && (
-          <Alert variant="default">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <AlertTitle>Estudiante encontrado</AlertTitle>
-            <AlertDescription>
-              <pre className="text-sm whitespace-pre-wrap">{scannedData}</pre>
-            </AlertDescription>
-          </Alert>
-        )}
+      {scannedData && (
+        <p className="mt-4 text-gray-600">Código escaneado: {scannedData}</p>
+      )}
 
-        {scannedData && estudianteEncontrado === false && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Estudiante no encontrado</AlertTitle>
-            <AlertDescription>
-              <pre className="text-sm whitespace-pre-wrap">{scannedData}</pre>
-            </AlertDescription>
-          </Alert>
-        )}
-      </div>
+      {studentFound && (
+        <div className="mt-6 bg-green-100 p-4 rounded-md text-green-800 w-full max-w-md">
+          <h2 className="text-lg font-medium">Estudiante encontrado</h2>
+          <p><strong>Nombre:</strong> {studentFound.name}</p>
+          <p><strong>Grado:</strong> {studentFound.grade}</p>
+        </div>
+      )}
     </div>
   );
 };

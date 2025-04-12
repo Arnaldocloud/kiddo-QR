@@ -17,7 +17,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
   onCancel,
   scanningAreaStyle,
   scanningContainerStyle
-}) => {
+}: QRScannerProps) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isCameraAvailable, setIsCameraAvailable] = useState(false);
